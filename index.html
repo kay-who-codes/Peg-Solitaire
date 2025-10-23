@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>♟️ Peg Solitaire</title>
+    <style>
+        :root {
+            --primary-accent: #4caf50;
+            --secondary-accent: #ff4081;
+            --background: #131313;
+            --text-light: #E0E0E0;
+            --text-white: #FFFFFF;
+            --board-bg: #2a2a2a;
+            --hole-bg: #1a1a1a;
+            --hole-border: #404040;
+            --peg-color: #8B4513;
+            --peg-selected: #ff4081;
+            --peg-hover: #A0522D;
+            --valid-move: #4caf50;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --win-glow: #FFD700;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--background);
+            color: var(--text-light);
+            min-height: 100vh;
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        header {
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: var(--text-white);
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px var(--shadow);
+        }
+
+        .subtitle {
+            color: var(--text-light);
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+
+        .game-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: var(--primary-accent);
+            color: var(--text-white);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            min-width: 48px;
+            min-height: 48px;
+            box-shadow: 0 4px 8px var(--shadow);
+        }
+
+        .btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px var(--shadow);
+        }
+
+        .btn.secondary {
+            background: var(--secondary-accent);
+        }
+
+        .btn.secondary:hover {
+            background: #e91e63;
+        }
+
+        .btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .game-board {
+            background: var(--board-bg);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px var(--shadow);
+            margin-bottom: 30px;
+            display: inline-block;
+        }
+
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-template-rows: repeat(7, 1fr);
+            gap: 8px;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 1;
+        }
+
+        .hole {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            background: var(--hole-bg);
+            border: 2px solid var(--hole-border);
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 40px;
+            min-height: 40px;
+        }
+
+        .hole.empty {
+            background: var(--hole-bg);
+            border-color: var(--hole-border);
+        }
+
+        .hole.invalid {
+            background: transparent;
+            border: none;
+            cursor: default;
+        }
+
+        .hole.valid-move {
+            background: rgba(76, 175, 80, 0.2);
+            border-color: var(--valid-move);
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .hole.center {
+            border-color: var(--primary-accent);
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+        }
+
+        .peg {
+            width: 85%;
+            height: 85%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, var(--peg-hover), var(--peg-color));
+            box-shadow: 0 4px 8px var(--shadow), inset 0 2px 4px rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .peg:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 12px var(--shadow), inset 0 2px 4px rgba(255, 255, 255, 0.2);
+        }
+
+        .peg.selected {
+            border-color: var(--peg-selected);
+            box-shadow: 0 0 20px var(--peg-selected), 0 6px 12px var(--shadow);
+            transform: scale(1.1);
+        }
+
+        .peg.jumping {
+            animation: jump 0.5s ease-in-out;
+        }
+
+        .peg.removing {
+            animation: remove 0.3s ease-in-out forwards;
+        }
+
+        .peg.winner {
+            animation: winner 2s ease-in-out infinite;
+        }
+
+        @keyframes jump {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3) translateY(-10px); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes remove {
+            0% { 
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(0.5);
+                opacity: 0.5;
+            }
+            100% { 
+                transform: scale(0);
+                opacity: 0;
+            }
+        }
+
+        @keyframes winner {
+            0%, 100% { 
+                transform: scale(1);
+                box-shadow: 0 0 20px var(--win-glow);
+            }
+            50% { 
+                transform: scale(1.2);
+                box-shadow: 0 0 40px var(--win-glow);
+            }
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            background: var(--board-bg);
+            padding: 15px 25px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 8px var(--shadow);
+            min-width: 120px;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary-accent);
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-top: 5px;
+        }
+
+        .game-status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-status.playing {
+            background: var(--board-bg);
+            color: var(--text-light);
+        }
+
+        .game-status.won {
+            background: var(--primary-accent);
+            color: var(--text-white);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .game-status.lost {
+            background: var(--secondary-accent);
+            color: var(--text-white);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .instructions {
+            background: var(--board-bg);
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            text-align: left;
+            box-shadow: 0 4px 8px var(--shadow);
+        }
+
+        .instructions h3 {
+            color: var(--primary-accent);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .instructions ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .instructions li {
+            margin-bottom: 10px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .instructions li::before {
+            content: "•";
+            color: var(--primary-accent);
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .game-board {
+                padding: 20px;
+            }
+
+            .board-grid {
+                max-width: 350px;
+                gap: 6px;
+            }
+
+            .hole {
+                min-width: 35px;
+                min-height: 35px;
+            }
+
+            .stats {
+                gap: 15px;
+            }
+
+            .stat {
+                padding: 10px 15px;
+                min-width: 100px;
+            }
+
+            .stat-value {
+                font-size: 1.5rem;
+            }
+
+            .btn {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .board-grid {
+                max-width: 300px;
+                gap: 4px;
+            }
+
+            .hole {
+                min-width: 30px;
+                min-height: 30px;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .game-board {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Peg Solitaire</h1>
+            <p class="subtitle">Jump pegs to remove them. Goal: One peg remaining!</p>
+        </header>
+
+        <div class="game-controls">
+            <button class="btn" onclick="newGame()">New Game</button>
+            <button class="btn secondary" onclick="undoMove()" id="undo-btn" disabled>Undo Move</button>
+            <button class="btn" onclick="showHint()" id="hint-btn">Show Hint</button>
+        </div>
+
+        <div class="game-status playing" id="game-status">
+            Click a peg, then click an empty hole to jump over a peg
+        </div>
+
+        <div class="game-board">
+            <div class="board-grid" id="board">
+                <!-- Board will be generated by JavaScript -->
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <span class="stat-value" id="pegs-count">32</span>
+                <div class="stat-label">Pegs Left</div>
+            </div>
+            <div class="stat">
+                <span class="stat-value" id="moves-count">0</span>
+                <div class="stat-label">Moves</div>
+            </div>
+            <div class="stat">
+                <span class="stat-value" id="time-count">00:00</span>
+                <div class="stat-label">Time</div>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>How to Play</h3>
+            <ul>
+                <li>Click a peg to select it</li>
+                <li>Click an empty hole to jump over an adjacent peg</li>
+                <li>The jumped peg will be removed</li>
+                <li>Only horizontal and vertical moves allowed</li>
+                <li>Goal: Reduce to one peg, ideally in the center</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        class PegSolitaire {
+            constructor() {
+                this.board = [];
+                this.selectedPeg = null;
+                this.moveHistory = [];
+                this.moves = 0;
+                this.startTime = null;
+                this.gameTimer = null;
+                this.gameEnded = false;
+                
+                this.initializeGame();
+            }
+
+            initializeGame() {
+                // Create board with pegs everywhere except center (3,3)
+                this.board = [];
+                for (let row = 0; row < 7; row++) {
+                    this.board[row] = [];
+                    for (let col = 0; col < 7; col++) {
+                        if (this.isValidPosition(row, col)) {
+                            // Place peg everywhere except center
+                            if (row === 3 && col === 3) {
+                                this.board[row][col] = 0; // Empty center
+                            } else {
+                                this.board[row][col] = 1; // Peg
+                            }
+                        } else {
+                            this.board[row][col] = -1; // Invalid position
+                        }
+                    }
+                }
+                
+                this.selectedPeg = null;
+                this.moveHistory = [];
+                this.moves = 0;
+                this.gameEnded = false;
+                this.startTime = Date.now();
+                this.startTimer();
+                this.createBoard();
+                this.updateStats();
+                this.updateGameStatus("Click a peg, then click an empty hole to jump over a peg");
+                document.getElementById('undo-btn').disabled = true;
+            }
+
+            isValidPosition(row, col) {
+                // English board pattern (cross shape)
+                if (row >= 0 && row <= 1) {
+                    return col >= 2 && col <= 4;
+                } else if (row >= 2 && row <= 4) {
+                    return col >= 0 && col <= 6;
+                } else if (row >= 5 && row <= 6) {
+                    return col >= 2 && col <= 4;
+                }
+                return false;
+            }
+
+            createBoard() {
+                const boardElement = document.getElementById('board');
+                boardElement.innerHTML = '';
+                
+                for (let row = 0; row < 7; row++) {
+                    for (let col = 0; col < 7; col++) {
+                        const hole = document.createElement('div');
+                        hole.className = 'hole';
+                        hole.dataset.row = row;
+                        hole.dataset.col = col;
+                        
+                        if (!this.isValidPosition(row, col)) {
+                            hole.classList.add('invalid');
+                        } else {
+                            if (row === 3 && col === 3) {
+                                hole.classList.add('center');
+                            }
+                            
+                            if (this.board[row][col] === 1) {
+                                const peg = document.createElement('div');
+                                peg.className = 'peg';
+                                peg.onclick = (e) => {
+                                    e.stopPropagation();
+                                    this.selectPeg(row, col);
+                                };
+                                hole.appendChild(peg);
+                            } else if (this.board[row][col] === 0) {
+                                hole.classList.add('empty');
+                                hole.onclick = () => this.makeMove(row, col);
+                            }
+                        }
+                        
+                        boardElement.appendChild(hole);
+                    }
+                }
+            }
+
+            selectPeg(row, col) {
+                if (this.gameEnded || this.board[row][col] !== 1) return;
+                
+                this.clearSelection();
+                this.selectedPeg = { row, col };
+                
+                const hole = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+                const peg = hole.querySelector('.peg');
+                if (peg) {
+                    peg.classList.add('selected');
+                }
+                
+                this.highlightValidMoves(row, col);
+                this.updateGameStatus("Now click an empty hole to jump to");
+            }
+
+            clearSelection() {
+                document.querySelectorAll('.peg.selected').forEach(peg => {
+                    peg.classList.remove('selected');
+                });
+                document.querySelectorAll('.hole.valid-move').forEach(hole => {
+                    hole.classList.remove('valid-move');
+                });
+                this.selectedPeg = null;
+            }
+
+            highlightValidMoves(row, col) {
+                const directions = [
+                    { dr: -2, dc: 0 }, // Up
+                    { dr: 2, dc: 0 },  // Down
+                    { dr: 0, dc: -2 }, // Left
+                    { dr: 0, dc: 2 }   // Right
+                ];
+                
+                directions.forEach(dir => {
+                    const newRow = row + dir.dr;
+                    const newCol = col + dir.dc;
+                    
+                    if (this.isValidMove(row, col, newRow, newCol)) {
+                        const hole = document.querySelector(`[data-row="${newRow}"][data-col="${newCol}"]`);
+                        if (hole) {
+                            hole.classList.add('valid-move');
+                        }
+                    }
+                });
+            }
+
+            isValidMove(fromRow, fromCol, toRow, toCol) {
+                // Check bounds and valid positions
+                if (!this.isValidPosition(toRow, toCol)) return false;
+                
+                // Check if source has a peg
+                if (this.board[fromRow][fromCol] !== 1) return false;
+                
+                // Check if destination is empty
+                if (this.board[toRow][toCol] !== 0) return false;
+                
+                // Check if there's a peg to jump over
+                const middleRow = (fromRow + toRow) / 2;
+                const middleCol = (fromCol + toCol) / 2;
+                
+                if (middleRow % 1 !== 0 || middleCol % 1 !== 0) return false;
+                if (!this.isValidPosition(middleRow, middleCol)) return false;
+                if (this.board[middleRow][middleCol] !== 1) return false;
+                
+                // Check if move is exactly 2 spaces (horizontal or vertical)
+                const rowDiff = Math.abs(toRow - fromRow);
+                const colDiff = Math.abs(toCol - fromCol);
+                
+                return (rowDiff === 2 && colDiff === 0) || (rowDiff === 0 && colDiff === 2);
+            }
+
+            makeMove(toRow, toCol) {
+                if (!this.selectedPeg || this.gameEnded) return;
+                
+                const fromRow = this.selectedPeg.row;
+                const fromCol = this.selectedPeg.col;
+                
+                if (this.isValidMove(fromRow, fromCol, toRow, toCol)) {
+                    const middleRow = (fromRow + toRow) / 2;
+                    const middleCol = (fromCol + toCol) / 2;
+                    
+                    // Save move for undo
+                    this.moveHistory.push({
+                        from: { row: fromRow, col: fromCol },
+                        to: { row: toRow, col: toCol },
+                        removed: { row: middleRow, col: middleCol }
+                    });
+                    
+                    // Make the move
+                    this.board[fromRow][fromCol] = 0;
+                    this.board[middleRow][middleCol] = 0;
+                    this.board[toRow][toCol] = 1;
+                    
+                    this.moves++;
+                    this.animateMove(fromRow, fromCol, toRow, toCol, middleRow, middleCol);
+                    
+                    setTimeout(() => {
+                        this.createBoard();
+                        this.updateStats();
+                        this.checkGameEnd();
+                        document.getElementById('undo-btn').disabled = false;
+                    }, 600);
+                } else {
+                    this.clearSelection();
+                    this.updateGameStatus("Invalid move! Try again.");
+                }
+            }
+
+            animateMove(fromRow, fromCol, toRow, toCol, middleRow, middleCol) {
+                const fromHole = document.querySelector(`[data-row="${fromRow}"][data-col="${fromCol}"]`);
+                const middleHole = document.querySelector(`[data-row="${middleRow}"][data-col="${middleCol}"]`);
+                
+                const fromPeg = fromHole.querySelector('.peg');
+                const middlePeg = middleHole.querySelector('.peg');
+                
+                if (fromPeg) {
+                    fromPeg.classList.add('jumping');
+                }
+                
+                if (middlePeg) {
+                    setTimeout(() => {
+                        middlePeg.classList.add('removing');
+                    }, 200);
+                }
+            }
+
+            undoMove() {
+                if (this.moveHistory.length === 0 || this.gameEnded) return;
+                
+                const lastMove = this.moveHistory.pop();
+                
+                // Restore the board state
+                this.board[lastMove.from.row][lastMove.from.col] = 1;
+                this.board[lastMove.removed.row][lastMove.removed.col] = 1;
+                this.board[lastMove.to.row][lastMove.to.col] = 0;
+                
+                this.moves--;
+                this.createBoard();
+                this.updateStats();
+                this.updateGameStatus("Move undone");
+                
+                if (this.moveHistory.length === 0) {
+                    document.getElementById('undo-btn').disabled = true;
+                }
+            }
+
+            showHint() {
+                if (this.gameEnded) return;
+                
+                const possibleMoves = this.getAllPossibleMoves();
+                if (possibleMoves.length > 0) {
+                    const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                    this.selectPeg(randomMove.from.row, randomMove.from.col);
+                    this.updateGameStatus(`Hint: Try moving the highlighted peg`);
+                } else {
+                    this.updateGameStatus("No moves available!");
+                }
+            }
+
+            getAllPossibleMoves() {
+                const moves = [];
+                
+                for (let row = 0; row < 7; row++) {
+                    for (let col = 0; col < 7; col++) {
+                        if (this.board[row][col] === 1) {
+                            const directions = [
+                                { dr: -2, dc: 0 }, { dr: 2, dc: 0 },
+                                { dr: 0, dc: -2 }, { dr: 0, dc: 2 }
+                            ];
+                            
+                            directions.forEach(dir => {
+                                const newRow = row + dir.dr;
+                                const newCol = col + dir.dc;
+                                
+                                if (this.isValidMove(row, col, newRow, newCol)) {
+                                    moves.push({
+                                        from: { row, col },
+                                        to: { row: newRow, col: newCol }
+                                    });
+                                }
+                            });
+                        }
+                    }
+                }
+                
+                return moves;
+            }
+
+            checkGameEnd() {
+                const pegsLeft = this.countPegs();
+                const possibleMoves = this.getAllPossibleMoves();
+                
+                if (possibleMoves.length === 0) {
+                    this.gameEnded = true;
+                    clearInterval(this.gameTimer);
+                    
+                    if (pegsLeft === 1) {
+                        const centerHasPeg = this.board[3][3] === 1;
+                        if (centerHasPeg) {
+                            this.updateGameStatus("🎉 Perfect! You won with one peg in the center! 🎉");
+                            this.highlightWinningPeg();
+                        } else {
+                            this.updateGameStatus("🎉 Great! You won with one peg remaining! 🎉");
+                        }
+                        document.getElementById('game-status').className = 'game-status won';
+                    } else {
+                        this.updateGameStatus(`Game Over! ${pegsLeft} pegs remaining. Try again!`);
+                        document.getElementById('game-status').className = 'game-status lost';
+                    }
+                } else {
+                    this.updateGameStatus(`${pegsLeft} pegs left. Keep going!`);
+                }
+            }
+
+            highlightWinningPeg() {
+                const centerHole = document.querySelector(`[data-row="3"][data-col="3"]`);
+                const peg = centerHole ? centerHole.querySelector('.peg') : null;
+                if (peg) {
+                    peg.classList.add('winner');
+                }
+            }
+
+            countPegs() {
+                let count = 0;
+                for (let row = 0; row < 7; row++) {
+                    for (let col = 0; col < 7; col++) {
+                        if (this.board[row][col] === 1) count++;
+                    }
+                }
+                return count;
+            }
+
+            updateStats() {
+                document.getElementById('pegs-count').textContent = this.countPegs();
+                document.getElementById('moves-count').textContent = this.moves;
+            }
+
+            updateGameStatus(message) {
+                document.getElementById('game-status').textContent = message;
+            }
+
+            startTimer() {
+                if (this.gameTimer) clearInterval(this.gameTimer);
+                this.gameTimer = setInterval(() => {
+                    this.updateTimer();
+                }, 1000);
+            }
+
+            updateTimer() {
+                if (!this.startTime) return;
+                const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('time-count').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+
+        let game;
+
+        function newGame() {
+            game = new PegSolitaire();
+            document.getElementById('game-status').className = 'game-status playing';
+        }
+
+        function undoMove() {
+            if (game) {
+                game.undoMove();
+            }
+        }
+
+        function showHint() {
+            if (game) {
+                game.showHint();
+            }
+        }
+
+        // Initialize game on page load
+        window.onload = function() {
+            newGame();
+        };
+    </script>
+</body>
+</html>
